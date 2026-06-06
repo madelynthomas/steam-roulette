@@ -13,7 +13,7 @@ export default function Home() {
     setLoading(true);
     const res = await fetch(`/api/library?steamid=${steamid}`);
     const data = await res.json();
-    setGames(data.games || []);
+    setGames((data.games || []).sort((a, b) => a.name.localeCompare(b.name)));
     setLoading(false);
   }
 
