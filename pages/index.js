@@ -81,7 +81,7 @@ export default function Home() {
             setSuggestion(null);
           }}
           placeholder="Enter a genre (e.g. Action, RPG)"
-          className="bg-gray-700 px-4 py-2 rounded w-64"
+          className="bg-gray-700 px-4 py-2 rounded w-66"
         />
         <button
           onClick={spin}
