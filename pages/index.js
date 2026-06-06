@@ -1,15 +1,46 @@
 import { useState } from "react";
 
+const MAX_ATTEMPTS = 20;
+
 export default function Home() {
   const [steamid, setSteamid] = useState("");
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [genre, setGenre] = useState("");
+  const [suggestion, setSuggestion] = useState(null);
 
   async function fetchLibrary() {
     setLoading(true);
     const res = await fetch(`/api/library?steamid=${steamid}`);
     const data = await res.json();
     setGames(data.games || []);
+    setLoading(false);
+  }
+
+  async function spin() {
+    if (!genre || games.length === 0) return;
+
+    setLoading(true);
+    setSuggestion(null);
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const randomGame = games[Math.floor(Math.random() * games.length)];
+      const res = await fetch(`/api/gamedetails?appid=${randomGame.appid}`);
+      const data = await res.json();
+
+      if (!data?.genres) continue;
+      const matches = data.genres.some((g) =>
+        g.description.toLowerCase().includes(genre.toLowerCase()),
+      );
+
+      if (matches) {
+        setSuggestion(randomGame);
+        setLoading(false);
+        return;
+      }
+    }
+
+    setSuggestion({ notFound: true });
     setLoading(false);
   }
 
@@ -28,13 +59,43 @@ export default function Home() {
         <button
           onClick={fetchLibrary}
           className="bg-blue-600 px-4 py-2 rounded"
-        />
-        {loading ? "Loading..." : "Load Library"}
+        >
+          {loading ? "Loading..." : "Load Library"}
+        </button>
       </div>
+
+      <div className="flex gap-2 mb-8">
+        <input
+          type="text"
+          value={genre}
+          onChange={(e) => setGenre(e.target.value)}
+          placeholder="Enter a genre (e.g. Action, RPG)"
+          className="bg-gray-700 px-4 py-2 rounded w-64"
+        />
+        <button
+          onClick={spin}
+          className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+        >
+          Spin
+        </button>
+      </div>
+
+      {suggestion && (
+        <div className="mt-8 p-6 bg-gray-800 rounded-lg">
+          {suggestion.notFound ? (
+            <p>
+              No games found for &quot;{genre}&quot; after {MAX_ATTEMPTS}{" "}
+              attempts. Try a different genre.
+            </p>
+          ) : (
+            <p className="text-xl font-bold">🎮 {suggestion.name}</p>
+          )}
+        </div>
+      )}
 
       <ul>
         {games.map((game) => (
-          <li key={game.appId}>{game.name}</li>
+          <li key={game.appid}>{game.name}</li>
         ))}
       </ul>
     </main>
