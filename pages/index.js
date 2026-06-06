@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const MAX_ATTEMPTS = 20;
 
@@ -58,7 +58,7 @@ export default function Home() {
         />
         <button
           onClick={fetchLibrary}
-          className="bg-blue-600 px-4 py-2 rounded"
+          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
         >
           {loading ? "Loading..." : "Load Library"}
         </button>
@@ -68,7 +68,10 @@ export default function Home() {
         <input
           type="text"
           value={genre}
-          onChange={(e) => setGenre(e.target.value)}
+          onChange={(e) => {
+            setGenre(e.target.value);
+            setSuggestion(null);
+          }}
           placeholder="Enter a genre (e.g. Action, RPG)"
           className="bg-gray-700 px-4 py-2 rounded w-64"
         />
@@ -84,8 +87,8 @@ export default function Home() {
         <div className="mt-8 p-6 bg-gray-800 rounded-lg">
           {suggestion.notFound ? (
             <p>
-              No games found for &quot;{genre}&quot; after {MAX_ATTEMPTS}{" "}
-              attempts. Try a different genre.
+              ❌ No games found for &quot;<b>{genre}</b>&quot; after{" "}
+              {MAX_ATTEMPTS} attempts. Try a different genre.
             </p>
           ) : (
             <p className="text-xl font-bold">🎮 {suggestion.name}</p>
