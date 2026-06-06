@@ -52,6 +52,19 @@ export default function Home() {
     setLoading(false);
   }
 
+  function toggleInstalled(appid) {
+    setInstalled((prev) => {
+      const next = new Set(prev);
+      if (next.has(appid)) {
+        next.delete(appid);
+      } else {
+        next.add(appid);
+      }
+      localStorage.setItem("installed", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
   return (
     <main className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-3xl font-bold mb-6">Steam Roulette</h1>
@@ -104,9 +117,19 @@ export default function Home() {
         </div>
       )}
 
-      <ul>
+      <ul className="space-y-1">
         {games.map((game) => (
-          <li key={game.appid}>{game.name}</li>
+          <li key={game.appid} className="flex items-center gap-3">
+            <button
+              onClick={() => toggleInstalled(game.appid)}
+              className={`px-2 py-1 rounded text-sm ${
+                installed.has(game.appid) ? "bg-green-600" : "bg-gray-600"
+              }`}
+            >
+              {installed.has(game.appid) ? "Installed" : "Not Installed"}
+            </button>
+            {game.name}
+          </li>
         ))}
       </ul>
     </main>
