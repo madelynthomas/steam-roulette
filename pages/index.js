@@ -12,16 +12,24 @@ export default function Home() {
   const [installedOnly, setInstalledOnly] = useState(false);
 
   useEffect(() => {
+    const previousId = localStorage.getItem("steamid");
     const saved = localStorage.getItem("installed");
+    const savedGames = localStorage.getItem("games");
     // eslint-disable-next-line
+    setSteamid(previousId);
     if (saved) setInstalled(new Set(JSON.parse(saved)));
+    if (savedGames) setGames(JSON.parse(savedGames));
   }, []);
 
   async function fetchLibrary() {
     setLoading(true);
     const res = await fetch(`/api/library?steamid=${steamid}`);
     const data = await res.json();
-    setGames((data.games || []).sort((a, b) => a.name.localeCompare(b.name)));
+    const sorted = (data.games || []).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    setGames(sorted);
+    localStorage.setItem("games", JSON.stringify(sorted));
     setLoading(false);
   }
 
@@ -73,7 +81,10 @@ export default function Home() {
         <input
           type="text"
           value={steamid}
-          onChange={(e) => setSteamid(e.target.value)}
+          onChange={(e) => {
+            setSteamid(e.target.value);
+            localStorage.setItem("steamid", e.target.value);
+          }}
           placeholder="Enter your Steam ID"
           className="bg-gray-700 px-4 py-2 rounded w-64"
         />
