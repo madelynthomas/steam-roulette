@@ -8,6 +8,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [genre, setGenre] = useState("");
   const [suggestion, setSuggestion] = useState(null);
+  const [installed, setInstalled] = useState(new Set());
+  const [installedOnly, setInstalledOnly] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("installed");
+    // eslint-disable-next-line
+    if (saved) setInstalled(new Set(JSON.parse(saved)));
+  }, []);
 
   async function fetchLibrary() {
     setLoading(true);
