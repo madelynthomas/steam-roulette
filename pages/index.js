@@ -89,8 +89,8 @@ export default function Home() {
             setSteamid(e.target.value);
             localStorage.setItem("steamid", e.target.value);
           }}
-          placeholder="Enter your Steam ID"
-          className="bg-gray-700 px-4 py-2 rounded w-64"
+          placeholder="Enter your Steam Username or Steam ID"
+          className="bg-gray-700 px-4 py-2 rounded w-82"
         />
         <button
           onClick={fetchLibrary}
