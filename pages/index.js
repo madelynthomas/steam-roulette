@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { useState, useEffect } from "react";
 
 const MAX_ATTEMPTS = 20;
@@ -130,14 +131,21 @@ export default function Home() {
       </div>
 
       {suggestion && (
-        <div className="mt-8 p-6 bg-gray-800 rounded-lg">
+        <div className="mt-8 p-6 bg-gray-800 rounded-lg mb-8">
           {suggestion.notFound ? (
             <p>
               ❌ No games found for &quot;<b>{genre}</b>&quot; after{" "}
               {MAX_ATTEMPTS} attempts. Try a different genre.
             </p>
           ) : (
-            <p className="text-xl font-bold">🎮 {suggestion.name}</p>
+            <div>
+              <img
+                src={`https://cdn.akamai.steamstatic.com/steam/apps/${suggestion.appid}/header.jpg`}
+                alt={suggestion.name}
+                className="rounded mb-4"
+              />
+              <p className="text-xl font-bold">🎮 {suggestion.name}</p>
+            </div>
           )}
         </div>
       )}
