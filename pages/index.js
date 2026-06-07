@@ -11,6 +11,7 @@ export default function Home() {
   const [suggestion, setSuggestion] = useState(null);
   const [installed, setInstalled] = useState(new Set());
   const [installedOnly, setInstalledOnly] = useState(false);
+  const [showInstalledList, setShowInstalledList] = useState(false);
 
   useEffect(() => {
     const previousId = localStorage.getItem("steamid");
@@ -43,7 +44,6 @@ export default function Home() {
     const pool = installedOnly
       ? games.filter((g) => installed.has(g.appid))
       : games;
-
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       const randomGame = pool[Math.floor(Math.random() * pool.length)];
       const res = await fetch(`/api/gamedetails?appid=${randomGame.appid}`);
@@ -90,7 +90,7 @@ export default function Home() {
             setSteamid(e.target.value);
             localStorage.setItem("steamid", e.target.value);
           }}
-          placeholder="Enter your Steam Username or Steam ID"
+          placeholder="Enter your Steam username or Steam ID"
           className="bg-gray-700 px-4 py-2 rounded w-82"
         />
         <button
@@ -150,21 +150,27 @@ export default function Home() {
         </div>
       )}
 
-      <ul className="space-y-1">
-        {games.map((game) => (
-          <li key={game.appid} className="flex items-center gap-3">
-            <button
-              onClick={() => toggleInstalled(game.appid)}
-              className={`px-2 py-1 rounded text-sm ${
-                installed.has(game.appid) ? "bg-green-600" : "bg-gray-600"
-              }`}
-            >
-              {installed.has(game.appid) ? "Installed" : "Not Installed"}
-            </button>
-            {game.name}
-          </li>
-        ))}
-      </ul>
+      <button
+        className={`${showInstalledList ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"} px-4 py-2 mb-4 rounded`}
+        onClick={() => setShowInstalledList(!showInstalledList)}
+      >
+        {showInstalledList ? "Collapse" : "Show"} installed game list
+      </button>
+      {showInstalledList && (
+        <ul className="space-y-1">
+          {games.map((game) => (
+            <li key={game.appid} className="flex items-center gap-3">
+              <button
+                onClick={() => toggleInstalled(game.appid)}
+                className={`px-2 py-1 rounded text-sm ${installed.has(game.appid) ? "bg-green-600" : "bg-gray-600"}`}
+              >
+                {installed.has(game.appid) ? "Installed" : "Not Installed"}
+              </button>
+              {game.name}
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }
