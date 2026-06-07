@@ -114,6 +114,16 @@ export default function Home() {
           Spin
         </button>
       </div>
+      <div className="flex gap-2 mb-8">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={installedOnly}
+            onChange={(e) => setInstalledOnly(e.target.checked)}
+          />
+          Installed games only
+        </label>
+      </div>
 
       {suggestion && (
         <div className="mt-8 p-6 bg-gray-800 rounded-lg">
