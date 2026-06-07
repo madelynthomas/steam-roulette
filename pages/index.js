@@ -39,8 +39,12 @@ export default function Home() {
     setLoading(true);
     setSuggestion(null);
 
+    const pool = installedOnly
+      ? games.filter((g) => installed.has(g.appid))
+      : games;
+
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      const randomGame = games[Math.floor(Math.random() * games.length)];
+      const randomGame = pool[Math.floor(Math.random() * pool.length)];
       const res = await fetch(`/api/gamedetails?appid=${randomGame.appid}`);
       const data = await res.json();
 
