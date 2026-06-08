@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element -- Next.js <Image> requires known dimensions or domain config; neither works cleanly for Steam's CDN */
 import { useState, useEffect } from "react";
 
 const MAX_ATTEMPTS = 20;
@@ -13,6 +13,7 @@ export default function Home() {
   const [installedOnly, setInstalledOnly] = useState(false);
   const [showInstalledList, setShowInstalledList] = useState(false);
 
+  // localStorage is unavailable during SSR — useEffect ensures this runs on the client only
   useEffect(() => {
     const previousId = localStorage.getItem("steamid");
     const saved = localStorage.getItem("installed");
@@ -27,6 +28,7 @@ export default function Home() {
     setLoading(true);
     const res = await fetch(`/api/library?steamid=${steamid}`);
     const data = await res.json();
+    // Steam returns an empty object (no `games` key) for private profiles or accounts with no games
     const sorted = (data.games || []).sort((a, b) =>
       a.name.localeCompare(b.name),
     );
@@ -44,12 +46,16 @@ export default function Home() {
     const pool = installedOnly
       ? games.filter((g) => installed.has(g.appid))
       : games;
+    // Genre data requires a separate API call per game, so we can't pre-filter.
+    // Pick a random game, check its genres, and retry up to MAX_ATTEMPTS times if no match.
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
       const randomGame = pool[Math.floor(Math.random() * pool.length)];
       const res = await fetch(`/api/gamedetails?appid=${randomGame.appid}`);
       const data = await res.json();
 
+      // DLC, soundtracks, and software tools on Steam often have no genre data
       if (!data?.genres) continue;
+      // Partial, case-insensitive match — "RPG" will match "Action RPG", "Tactical RPG", etc.
       const matches = data.genres.some((g) =>
         g.description.toLowerCase().includes(genre.toLowerCase()),
       );
@@ -61,18 +67,20 @@ export default function Home() {
       }
     }
 
+    // Sentinel object — distinguishes "spin ran but found nothing" from null ("spin hasn't run yet")
     setSuggestion({ notFound: true });
     setLoading(false);
   }
 
   function toggleInstalled(appid) {
     setInstalled((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev); // React state must be immutable; copy before modifying
       if (next.has(appid)) {
         next.delete(appid);
       } else {
         next.add(appid);
       }
+      // localStorage sync happens inside the updater so it always reflects the final state value
       localStorage.setItem("installed", JSON.stringify([...next]));
       return next;
     });
@@ -107,7 +115,7 @@ export default function Home() {
           value={genre}
           onChange={(e) => {
             setGenre(e.target.value);
-            setSuggestion(null);
+            setSuggestion(null); // clear stale result so a previous spin doesn't show for a new genre
           }}
           placeholder="Enter a genre (e.g. Action, RPG)"
           className="bg-gray-700 px-4 py-2 rounded w-66"
