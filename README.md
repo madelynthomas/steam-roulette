@@ -55,7 +55,37 @@ pages/
     gamedetails.js  # Fetches genre data for a single game from the Steam store API
 styles/
   globals.css       # Tailwind base styles
+__tests__/
+  api/
+    library.test.js       # Unit tests for the library API route
+    gamedetails.test.js   # Unit tests for the gamedetails API route
+  components/
+    Home.test.jsx         # Component tests for the main page
+e2e/
+  home.spec.js      # Playwright end-to-end tests
 ```
+
+## Testing
+
+The project has three layers of test coverage. No live Steam API key is needed — all external calls are intercepted by mocks.
+
+### Unit & component tests (Vitest + React Testing Library)
+
+```bash
+npm test              # single run
+npm run test:watch    # watch mode for development
+```
+
+Covers the API route handlers (error cases, vanity URL resolution, Steam response shapes) and the React component (rendering, localStorage restore, load library flow, spin logic, installed toggle).
+
+### End-to-end tests (Playwright)
+
+```bash
+npm run test:e2e      # headless Chromium run
+npm run test:e2e:ui   # interactive UI with live browser preview and step-through trace
+```
+
+Covers full user flows in a real browser: loading a library, spinning for a genre match, toggling installed status, the installed-only filter, and localStorage persistence across page reloads.
 
 ## Tech Stack
 
@@ -63,3 +93,5 @@ styles/
 - [React 19](https://react.dev)
 - [Tailwind CSS v4](https://tailwindcss.com)
 - [Steam Web API](https://developer.valvesoftware.com/wiki/Steam_Web_API)
+- [Vitest](https://vitest.dev) + [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Playwright](https://playwright.dev)
