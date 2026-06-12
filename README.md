@@ -1,40 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# Steam Roulette
+
+A Next.js app that picks a random game from your Steam library that matches a genre you choose. Load your library once, mark which games are installed, then spin to get a suggestion.
+
+## Features
+
+- **Library loader** — enter your Steam username or 64-bit Steam ID to fetch your full game library
+- **Genre spin** — type any genre (e.g. "Action", "RPG", "Puzzle") and hit Spin to get a random matching game
+- **Installed filter** — toggle "Installed games only" to limit spins to games you've marked as installed
+- **Installed game list** — expand a checklist of your library to mark which titles are installed
+- **Persistence** — your Steam ID, game library, and installed selections are saved in `localStorage` so they survive page reloads
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+You need a [Steam Web API key](https://steamcommunity.com/dev/apikey). Your Steam profile must also be set to **public** for the library fetch to work.
+
+### Setup
+
+1. Clone the repo and install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Create a `.env.local` file in the project root with your Steam API key:
+
+   ```
+   STEAM_API_KEY=your_key_here
+   ```
+
+3. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## How to Use
+
+1. Enter your **Steam username** (vanity URL) or **17-digit Steam ID** and click **Load Library**
+2. Type a **genre** in the genre field (partial matches work — "RPG" will match "Action RPG", "Tactical RPG", etc.)
+3. Click **Spin** — the app picks a random game from your library, checks its genres via the Steam store API, and keeps trying until it finds a match (up to 20 attempts)
+4. Optionally click **Show installed game list** to mark which games you have installed, then check **Installed games only** to restrict spins to that subset
+
+## Project Structure
+
+```
+pages/
+  index.js          # Main UI — library loader, genre input, spin logic, installed list
+  api/
+    library.js      # Fetches owned games from Steam; resolves vanity URLs to Steam IDs
+    gamedetails.js  # Fetches genre data for a single game from the Steam store API
+styles/
+  globals.css       # Tailwind base styles
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
-
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
-
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
-
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+- [Next.js 16](https://nextjs.org) (Pages Router)
+- [React 19](https://react.dev)
+- [Tailwind CSS v4](https://tailwindcss.com)
+- [Steam Web API](https://developer.valvesoftware.com/wiki/Steam_Web_API)
