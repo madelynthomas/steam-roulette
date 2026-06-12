@@ -1,6 +1,8 @@
 import { describe, test, expect, vi, afterEach } from "vitest";
 import handler from "../../pages/api/gamedetails";
 
+// Same lightweight req/res pattern as the library tests — the handler only
+// uses req.query and calls res.status(...).json(...).
 function makeReqRes(query = {}) {
   const res = {
     status: vi.fn().mockReturnThis(),
@@ -18,6 +20,8 @@ describe("GET /api/gamedetails", () => {
     const { req, res } = makeReqRes({});
     await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
+    // Note: the trailing space in the error string is intentional — it matches
+    // the source exactly so this test would catch an accidental fix to that typo.
     expect(res.json).toHaveBeenCalledWith({ error: "appid is required " });
   });
 
@@ -29,6 +33,8 @@ describe("GET /api/gamedetails", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
+        // The Steam store API wraps the response as { [appid]: { success, data } }.
+        // The handler unwraps this — we verify the unwrapped value reaches the caller.
         json: () =>
           Promise.resolve({
             730: { success: true, data: gameData },
@@ -68,7 +74,9 @@ describe("GET /api/gamedetails", () => {
       vi.fn().mockResolvedValue({
         json: () =>
           Promise.resolve({
-            // Some appids return success:true but no data (e.g. DLC)
+            // DLC and soundtracks on Steam sometimes return success:true but
+            // omit the `data` field entirely. The spin logic skips these entries
+            // (checks !data?.genres), so null is the correct response here.
             12345: { success: true },
           }),
       }),

@@ -5,6 +5,8 @@ import Home from "../../pages/index";
 
 // ---- Helpers ----------------------------------------------------------------
 
+// Returns a stubbed fetch that resolves with a library response.
+// Defined once here so every test that needs a loaded library uses identical data.
 function mockFetchLibrary(games = []) {
   return vi.fn().mockResolvedValue({
     ok: true,
@@ -12,6 +14,7 @@ function mockFetchLibrary(games = []) {
   });
 }
 
+// Returns a stubbed fetch that resolves with a game details response.
 function mockFetchGameDetails(genres = []) {
   return vi.fn().mockResolvedValue({
     ok: true,
@@ -19,6 +22,9 @@ function mockFetchGameDetails(genres = []) {
   });
 }
 
+// Creates a userEvent instance alongside the render. The instance must be
+// created before interactions begin — sharing one instance across a test
+// preserves pointer/keyboard state (e.g. focus) between actions.
 function renderHome() {
   const user = userEvent.setup();
   const view = render(<Home />);
@@ -28,11 +34,16 @@ function renderHome() {
 // ---- Setup ------------------------------------------------------------------
 
 beforeEach(() => {
+  // Clear localStorage before each test so persisted state from one test can't
+  // affect the next. Also restore any globals stubbed with vi.stubGlobal (e.g. fetch).
   localStorage.clear();
   vi.restoreAllMocks();
 });
 
 afterEach(() => {
+  // Belt-and-suspenders clear: if a test throws mid-way, beforeEach of the
+  // next test still runs first — this afterEach ensures we don't leave stale
+  // localStorage behind even if the next beforeEach somehow doesn't.
   localStorage.clear();
 });
 
@@ -106,7 +117,8 @@ describe("localStorage", () => {
     localStorage.setItem("steamid", "gaben");
     renderHome();
 
-    // The useEffect runs after initial render
+    // The component reads localStorage inside a useEffect which runs after the
+    // initial render — waitFor is required to catch the resulting state update.
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/steam username/i)).toHaveValue(
         "gaben",
@@ -133,11 +145,10 @@ describe("localStorage", () => {
 
     const { user } = renderHome();
 
-    // Show the list so we can inspect button states
+    // Show the list so we can inspect the installed/not-installed button states
     await user.click(await screen.findByRole("button", { name: /show installed game list/i }));
 
     await waitFor(() => {
-      // The game marked installed should show "Installed"
       expect(screen.getByText("Counter-Strike 2").closest("li")).toHaveTextContent(
         "Installed",
       );
@@ -157,6 +168,8 @@ describe("Load Library", () => {
   ];
 
   test("shows 'Loading...' while the request is in flight", async () => {
+    // Hold the fetch promise open manually so we can assert on the loading state
+    // before it resolves. We must resolve it at the end to avoid async leaks.
     let resolve;
     vi.stubGlobal(
       "fetch",
@@ -185,7 +198,8 @@ describe("Load Library", () => {
     await user.type(screen.getByPlaceholderText(/steam username/i), "gaben");
     await user.click(screen.getByRole("button", { name: /load library/i }));
 
-    // Open the list
+    // findByRole (not getByRole) waits for the async fetch to settle and the
+    // button label to revert from "Loading..." back to "Show installed game list"
     await user.click(
       await screen.findByRole("button", { name: /show installed game list/i }),
     );
@@ -225,6 +239,9 @@ describe("Spin", () => {
   const GAMES = [{ appid: 730, name: "Counter-Strike 2" }];
 
   test("shows a matching game suggestion when genres align", async () => {
+    // The first fetch call loads the library; all subsequent calls are game detail
+    // lookups during spin. mockResolvedValueOnce handles the library call, and
+    // mockResolvedValue (no Once) handles every detail call after that.
     vi.stubGlobal(
       "fetch",
       vi.fn()
@@ -244,7 +261,8 @@ describe("Spin", () => {
     const { user } = renderHome();
     await user.type(screen.getByPlaceholderText(/steam username/i), "gaben");
     await user.click(screen.getByRole("button", { name: /load library/i }));
-    await screen.findByRole("button", { name: /load library/i }); // wait for loading to finish
+    // Wait for the button label to revert, confirming the fetch has settled
+    await screen.findByRole("button", { name: /load library/i });
 
     await user.type(screen.getByPlaceholderText(/enter a genre/i), "Action");
     await user.click(screen.getByRole("button", { name: /spin/i }));
@@ -262,7 +280,8 @@ describe("Spin", () => {
           ok: true,
           json: () => Promise.resolve({ games: GAMES }),
         })
-        // All subsequent calls (game details) return no genres — nothing will match
+        // Returning null genres forces every attempt to fail — after MAX_ATTEMPTS
+        // (20) the component renders the "not found" sentinel message.
         .mockResolvedValue({
           ok: true,
           json: () => Promise.resolve({ genres: null }),
@@ -277,6 +296,8 @@ describe("Spin", () => {
     await user.type(screen.getByPlaceholderText(/enter a genre/i), "RPG");
     await user.click(screen.getByRole("button", { name: /spin/i }));
 
+    // Extended timeout: spin makes up to 20 sequential fetch calls before giving
+    // up, which takes longer than the default 5 s assertion timeout.
     await waitFor(
       () => {
         expect(screen.getByText(/no games found/i)).toBeInTheDocument();
@@ -311,7 +332,8 @@ describe("Spin", () => {
     await user.click(screen.getByRole("button", { name: /spin/i }));
     await screen.findByText(/counter-strike 2/i);
 
-    // Changing the genre input should clear the suggestion immediately
+    // The component clears the suggestion synchronously on genre input change
+    // so the query result should be absent immediately — no waitFor needed.
     await user.clear(screen.getByPlaceholderText(/enter a genre/i));
     await user.type(screen.getByPlaceholderText(/enter a genre/i), "RPG");
 
@@ -326,10 +348,10 @@ describe("Spin", () => {
     await user.click(screen.getByRole("button", { name: /load library/i }));
     await screen.findByRole("button", { name: /load library/i });
 
-    // Click Spin with no genre — fetch should not be called again
     await user.click(screen.getByRole("button", { name: /spin/i }));
 
-    // Only the initial library fetch should have happened
+    // Only the initial library fetch should have happened — spin short-circuits
+    // when genre is an empty string, so no gamedetails calls are made.
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
@@ -342,6 +364,8 @@ describe("Installed game list toggle", () => {
     { appid: 440, name: "Team Fortress 2" },
   ];
 
+  // Shared setup: stub fetch, type a Steam ID, click Load Library, and wait
+  // for the loading state to clear before each test in this describe block.
   async function loadGames(user) {
     vi.stubGlobal("fetch", mockFetchLibrary(GAMES));
     await user.type(screen.getByPlaceholderText(/steam username/i), "gaben");
@@ -382,6 +406,8 @@ describe("Installed game list toggle", () => {
     await user.click(screen.getByRole("button", { name: /show installed game list/i }));
     await screen.findByRole("list");
 
+    // within() scopes queries to a specific DOM node — without it, getByRole("button")
+    // would match every toggle button in the list, not just CS2's.
     const cs2Row = screen.getByText("Counter-Strike 2").closest("li");
     await user.click(within(cs2Row).getByRole("button"));
 
@@ -416,4 +442,3 @@ describe("Installed game list toggle", () => {
     expect(within(cs2Row).getByRole("button")).toHaveTextContent("Not Installed");
   });
 });
-

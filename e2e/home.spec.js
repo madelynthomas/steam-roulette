@@ -9,9 +9,12 @@ const MOCK_GAMES = [
 ];
 
 const ACTION_GENRES = [{ id: "1", description: "Action" }];
-const RPG_GENRES = [{ id: "3", description: "RPG" }];
 
-// Intercept the Next.js API routes so no real Steam API key is needed
+// ---- Route interception helpers ---------------------------------------------
+
+// page.route() intercepts matching network requests before they leave the
+// browser — no real Steam API key is needed and responses are deterministic.
+// Routes registered here apply for the lifetime of the page (or until replaced).
 async function mockLibraryAPI(page, games = MOCK_GAMES) {
   await page.route("**/api/library**", (route) =>
     route.fulfill({
@@ -114,6 +117,8 @@ test.describe("Load Library", () => {
 // ---- Spin flow --------------------------------------------------------------
 
 test.describe("Spin", () => {
+  // Load the library once before each spin test so individual tests only need
+  // to set the genre and click Spin.
   test.beforeEach(async ({ page }) => {
     await mockLibraryAPI(page);
     await mockGameDetailsAPI(page, ACTION_GENRES);
@@ -121,6 +126,9 @@ test.describe("Spin", () => {
 
     await page.getByPlaceholder(/steam username/i).fill("gaben");
     await page.getByRole("button", { name: "Load Library" }).click();
+    // waitFor on the "Load Library" button: the component changes its label to
+    // "Loading..." during the fetch and back when done — this line waits until
+    // the original label reappears, confirming the library is ready.
     await page.getByRole("button", { name: "Load Library" }).waitFor();
   });
 
@@ -128,7 +136,7 @@ test.describe("Spin", () => {
     await page.getByPlaceholder(/enter a genre/i).fill("Action");
     await page.getByRole("button", { name: "Spin" }).click();
 
-    // Any one of the mock games should appear
+    // Any of the three mock games could be picked — match any name in the result block
     const names = MOCK_GAMES.map((g) => g.name);
     await expect(page.locator(".mt-8")).toContainText(
       new RegExp(names.join("|")),
@@ -141,11 +149,14 @@ test.describe("Spin", () => {
 
     const img = page.locator(".mt-8 img").first();
     await expect(img).toBeVisible();
+    // Verify the image URL points to Steam's CDN, confirming the appid was
+    // correctly embedded in the header image URL.
     await expect(img).toHaveAttribute("src", /steamstatic\.com/);
   });
 
   test("shows 'no games found' when no genre matches are found", async ({ page }) => {
-    // Override gamedetails to return no genres
+    // Override the default gamedetails mock with one that returns null genres,
+    // forcing every spin attempt to fail and triggering the not-found message.
     await page.route("**/api/gamedetails**", (route) =>
       route.fulfill({
         status: 200,
@@ -157,6 +168,8 @@ test.describe("Spin", () => {
     await page.getByPlaceholder(/enter a genre/i).fill("RPG");
     await page.getByRole("button", { name: "Spin" }).click();
 
+    // Extended timeout: spin makes up to MAX_ATTEMPTS (20) sequential API calls
+    // before giving up — 15 s accommodates the worst case.
     await expect(page.getByText(/no games found/i)).toBeVisible({ timeout: 15000 });
   });
 
@@ -204,12 +217,16 @@ test.describe("Installed game list", () => {
     await page.getByRole("button", { name: /show installed game list/i }).click();
     await page.getByRole("list").waitFor();
 
+    // filter({ hasText }) scopes the locator to the exact list item — avoids
+    // the strict-mode error that occurs when locator("..") climbs to a parent
+    // shared by multiple items.
     const cs2Row = page.getByRole("listitem").filter({ hasText: "Counter-Strike 2" });
     await cs2Row.getByRole("button").click();
     await expect(cs2Row.getByRole("button")).toHaveText("Installed");
 
-    // Reload — the installed state should survive via localStorage
-    await mockLibraryAPI(page); // re-register mock before navigation
+    // Re-register the mock before reload — Playwright clears route handlers on
+    // navigation, so without this the reload would hit the real API.
+    await mockLibraryAPI(page);
     await page.reload();
     await page.getByRole("button", { name: /show installed game list/i }).click();
     await page.getByRole("list").waitFor();
@@ -234,6 +251,8 @@ test.describe("Installed game list", () => {
 
 test.describe("Installed-only filter", () => {
   test("spin only picks from installed games when the filter is on", async ({ page }) => {
+    // Track which appids the spin logic queries — captured from the intercepted
+    // gamedetails URL so we can assert the filter is actually narrowing the pool.
     const spunAppIds = [];
 
     await page.route("**/api/library**", (route) =>
@@ -249,7 +268,6 @@ test.describe("Installed-only filter", () => {
       }),
     );
 
-    // Capture which appid is queried during each spin
     await page.route("**/api/gamedetails**", (route) => {
       const url = new URL(route.request().url());
       spunAppIds.push(Number(url.searchParams.get("appid")));
@@ -265,16 +283,16 @@ test.describe("Installed-only filter", () => {
     await page.getByRole("button", { name: "Load Library" }).click();
     await page.getByRole("button", { name: "Load Library" }).waitFor();
 
-    // Mark only CS2 as installed
+    // Mark only CS2 as installed, leaving TF2 as not installed
     await page.getByRole("button", { name: /show installed game list/i }).click();
     await page.getByRole("list").waitFor();
     const cs2Row = page.getByRole("listitem").filter({ hasText: "Counter-Strike 2" });
     await cs2Row.getByRole("button").click();
 
-    // Enable filter
     await page.getByRole("checkbox", { name: /installed games only/i }).check();
 
-    // Spin several times and confirm only appid 730 (CS2) is ever picked
+    // Spin five times and confirm the filter held — only appid 730 (CS2) should
+    // ever be queried, never 440 (TF2).
     for (let i = 0; i < 5; i++) {
       spunAppIds.length = 0;
       await page.getByPlaceholder(/enter a genre/i).fill("Action");
@@ -282,7 +300,9 @@ test.describe("Installed-only filter", () => {
       await page.locator(".mt-8").waitFor();
       expect(spunAppIds.every((id) => id === 730)).toBe(true);
 
-      // Clear genre to reset suggestion before next iteration
+      // Clearing the genre field resets the suggestion so the next iteration
+      // starts from a clean state. Two fills are used: the first triggers the
+      // onChange clear, the second sets up the value for the next spin.
       await page.getByPlaceholder(/enter a genre/i).fill("");
       await page.getByPlaceholder(/enter a genre/i).fill("Action");
     }
@@ -310,7 +330,8 @@ test.describe("localStorage persistence", () => {
 
     await page.reload();
 
-    // Games should be available from localStorage — no Load Library click needed
+    // The component restores the game list from localStorage on mount — the user
+    // should not have to click Load Library again after a reload.
     await page.getByRole("button", { name: /show installed game list/i }).click();
     await expect(page.getByText("Counter-Strike 2")).toBeVisible();
   });
